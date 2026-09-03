@@ -1,0 +1,48 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13.7-management
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-lc"]
+    command: ["printf 'backendgym-cookie-1234' > /var/lib/rabbitmq/.erlang.cookie; chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie; chmod 400 /var/lib/rabbitmq/.erlang.cookie; exec gosu rabbitmq rabbitmq-server"]
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  api:
+    build: .
+    command: ["python3", "api.py"]
+    environment:
+      DB_PATH: /state/orders.db
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8000:8000"
+    volumes:
+      - state:/state
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  worker:
+    build: .
+    command: ["python3", "worker.py"]
+    environment:
+      DB_PATH: /state/orders.db
+      RABBITMQ_HOST: rabbitmq
+    volumes:
+      - state:/state
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  test:
+    profiles: ["test"]
+    build: .
+    command: ["python3", "-m", "unittest", "discover", "-s", "tests", "-v"]
+    environment:
+      TEST_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_started
+volumes:
+  state:
