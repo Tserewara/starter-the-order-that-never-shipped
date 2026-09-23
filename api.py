@@ -92,12 +92,24 @@ def poison():
     return {"published": True}, 202
 
 
+@app.post("/admin/arm-crash")
+def arm_crash():
+    # The next delivery makes the worker exit after it writes the warehouse
+    # record and before it acknowledges the message (drill D4).
+    open(os.path.join(os.path.dirname(DB_PATH) or ".", "crash-after-record"), "w").close()
+    return {"armed": True}
+
+
 @app.get("/admin/stats")
 def stats():
     connection = db()
+    attempts = connection.execute("SELECT count(*) FROM fulfillment_attempts").fetchone()[0]
+    unique = connection.execute("SELECT count(DISTINCT event_id) FROM fulfillment_attempts").fetchone()[0]
     result = {
         "orders": connection.execute("SELECT count(*) FROM orders").fetchone()[0],
-        "fulfillment_attempts": connection.execute("SELECT count(*) FROM fulfillment_attempts").fetchone()[0],
+        "fulfillment_attempts": attempts,
+        "unique_fulfilled_events": unique,
+        "duplicate_side_effects": attempts - unique,
         "publish_failures": connection.execute("SELECT count(*) FROM publish_failures").fetchone()[0],
     }
     connection.close()

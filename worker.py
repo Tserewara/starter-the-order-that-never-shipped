@@ -36,6 +36,10 @@ def main():
                     message = json.loads(body)
                     record(message)
                     print(json.dumps({"event": "fulfilled", "event_id": message["event_id"], "order_id": message["order_id"]}), flush=True)
+                    crash_path = os.path.join(os.path.dirname(DB_PATH) or ".", "crash-after-record")
+                    if os.path.exists(crash_path):
+                        os.remove(crash_path)
+                        os._exit(23)
                     ch.basic_ack(method.delivery_tag)
                 except Exception as exc:
                     print(json.dumps({"event": "message_rejected", "error": type(exc).__name__}), flush=True)

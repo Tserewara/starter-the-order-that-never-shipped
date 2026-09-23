@@ -1,5 +1,5 @@
 PROJECT=bgym_order
-.PHONY: up down test pause-broker resume-broker stats
+.PHONY: up down test pause-broker resume-broker stats arm-crash stop-worker start-worker deliveries
 
 up:
 	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose up -d --build
@@ -18,3 +18,15 @@ resume-broker:
 
 stats:
 	curl -fsS http://localhost:8000/admin/stats
+
+arm-crash:
+	curl -fsS -X POST http://localhost:8000/admin/arm-crash
+
+stop-worker:
+	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose kill worker
+
+start-worker:
+	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose start worker
+
+deliveries:
+	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose run --rm --build -e TEST_URL=http://api:8000 test python3 tools/deliveries.py
