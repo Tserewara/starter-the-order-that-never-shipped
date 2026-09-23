@@ -30,7 +30,11 @@ def db():
 
 def publish(message):
     connection = pika.BlockingConnection(
-        pika.ConnectionParameters(host=RABBITMQ_HOST, connection_attempts=1, socket_timeout=1)
+        # A paused broker accepts the TCP connection and then never answers;
+        # without a bound, each order would wait out pika's 15s handshake.
+        pika.ConnectionParameters(
+            host=RABBITMQ_HOST, connection_attempts=1, socket_timeout=1, stack_timeout=2
+        )
     )
     channel = connection.channel()
     channel.queue_declare(queue="orders", durable=True)
