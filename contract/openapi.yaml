@@ -1,0 +1,33 @@
+openapi: 3.0.3
+info:
+  title: BrasaCart checkout
+  version: 1.0.0
+  description: >
+    Checkout as the starter ships it. The image runs as `api` (port 8000) and
+    as `worker`, sharing /state; both read DB_PATH, RABBITMQ_HOST and
+    WAREHOUSE_URL. Every order ends up as a row in the warehouse's `picks`
+    table (event_id, order_id).
+paths:
+  /health:
+    get:
+      responses:
+        "200": {description: The API is up.}
+  /orders:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, properties: {customer: {type: string}, sku: {type: string}}}
+      responses:
+        "201":
+          description: The order is committed.
+          content:
+            application/json:
+              schema: {type: object, required: [order_id, event_id], properties: {order_id: {type: string}, event_id: {type: string}}}
+        "202": {description: The order is committed; its handoff to the warehouse is still pending.}
+  /admin/replay/{event_id}:
+    post:
+      parameters: [{name: event_id, in: path, required: true, schema: {type: string}}]
+      responses:
+        "200": {description: The order's event was sent again.}
+        "404": {description: No order has this event id.}

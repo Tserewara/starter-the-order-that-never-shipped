@@ -1,32 +1,41 @@
-PROJECT=bgym_order
-.PHONY: up down test pause-broker resume-broker stats arm-crash stop-worker start-worker deliveries
+COMPOSE = docker compose -f harness/compose.yaml
+.PHONY: up down contract outage deliveries pause-broker resume-broker stop-worker start-worker picks logs
 
+# The API, the worker, RabbitMQ and the warehouse feed.
 up:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose up -d --build
+	$(COMPOSE) up -d --build --wait api worker
 
 down:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose down -v
+	$(COMPOSE) down -v
 
-test:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose run --rm test
+# What the service already does, black-box. Passes before and after your change.
+contract:
+	$(COMPOSE) run --rm --build contract
+
+# Tuesday: the broker pauses, 100 orders come in, the broker comes back.
+outage:
+	$(COMPOSE) build tools
+	$(COMPOSE) pause rabbitmq
+	$(COMPOSE) run --rm tools python3 outage.py create; $(COMPOSE) unpause rabbitmq
+	$(COMPOSE) run --rm tools python3 outage.py check
+
+# 1,000 orders, a replay of every event, then the tally. Restart the worker while it runs.
+deliveries:
+	$(COMPOSE) run --rm --build tools python3 deliveries.py
 
 pause-broker:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose pause rabbitmq
-
+	$(COMPOSE) pause rabbitmq
 resume-broker:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose unpause rabbitmq
-
-stats:
-	curl -fsS http://localhost:8000/admin/stats
-
-arm-crash:
-	curl -fsS -X POST http://localhost:8000/admin/arm-crash
+	$(COMPOSE) unpause rabbitmq
 
 stop-worker:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose kill worker
-
+	$(COMPOSE) kill worker
 start-worker:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose start worker
+	$(COMPOSE) start worker
 
-deliveries:
-	COMPOSE_PROJECT_NAME=$(PROJECT) docker compose run --rm --build -e TEST_URL=http://api:8000 test python3 tools/deliveries.py
+# Rows in the warehouse feed, and how many orders have more than one.
+picks:
+	@$(COMPOSE) exec -T warehouse psql -U warehouse -tAc "SELECT 'picks=' || count(*) || ' orders=' || count(DISTINCT order_id) || ' duplicates=' || (count(*) - count(DISTINCT order_id)) FROM picks"
+
+logs:
+	$(COMPOSE) logs -f api worker

@@ -1,0 +1,73 @@
+# The world around checkout. The service's image runs twice, as `api` and
+# as `worker`; the two share /state. The harness talks to the API over HTTP
+# and reads the warehouse feed as a client.
+name: bgym-order
+
+x-service: &service
+  build: ../service
+  environment:
+    DB_PATH: /state/orders.db
+    RABBITMQ_HOST: rabbitmq
+    WAREHOUSE_URL: postgresql://warehouse:warehouse@warehouse:5432/warehouse
+  volumes:
+    - state:/state
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    warehouse:
+      condition: service_healthy
+
+services:
+  api:
+    <<: *service
+    command: ["api"]
+    ports:
+      - "8000:8000"
+
+  worker:
+    <<: *service
+    command: ["worker"]
+
+  rabbitmq:
+    image: rabbitmq:3.13.7-management
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  warehouse:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: warehouse
+    volumes:
+      - ./warehouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse -d warehouse"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  tools:
+    build: {context: ., dockerfile: tools.Dockerfile}
+    profiles: ["tools"]
+    environment:
+      SERVICE_URL: http://api:8000
+      WAREHOUSE_URL: postgresql://warehouse:warehouse@warehouse:5432/warehouse
+    volumes:
+      - tools-state:/work
+
+  contract:
+    build: ../contract
+    profiles: ["tools"]
+    environment:
+      SERVICE_URL: http://api:8000
+      WAREHOUSE_URL: postgresql://warehouse:warehouse@warehouse:5432/warehouse
+
+volumes:
+  state:
+  tools-state:
