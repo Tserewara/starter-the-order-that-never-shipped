@@ -19,14 +19,15 @@ volumes included.
 
 `POST /orders` takes `{"customer": "...", "sku": "..."}` and answers with
 the `order_id` and the `event_id` of the event it sends to the warehouse:
-201 when the event went out, 202 when it didn't. `POST
-/admin/replay/{event_id}` sends an order's event again, the way operators
-replayed events after Tuesday's outage.
+201 when the event went out, 202 when it didn't (the contract accepts
+either). `POST /admin/replay/{event_id}` sends an order's event again, with
+the same `event_id`, the way operators replayed events after Tuesday's
+outage.
 
 ## Break it
 
 - `make outage` pauses the broker, sends 100 orders, brings the broker back,
-  waits for the feed to settle and prints:
+  waits up to two minutes for the feed to settle and prints:
 
   ```
   accepted=100 in_warehouse=N lost=N duplicates=N
@@ -48,9 +49,10 @@ replayed events after Tuesday's outage.
 Checkout is Python and Flask; you can write it in another language. It is one
 image, built from `service/Dockerfile`, that runs as `api` (port 8000) and as
 `worker`, both sharing `/state` and reading `DB_PATH`, `RABBITMQ_HOST` and
-`WAREHOUSE_URL`. The worker writes picks to the warehouse's `picks` table
-(`event_id`, `order_id`). Anything else that has to run in the background
-goes in the `worker` role. Run `make contract` until it passes.
+`WAREHOUSE_URL` (a Postgres connection string). The worker writes picks to
+the warehouse's `picks` table (`event_id`, `order_id`); you may add tables or
+constraints to that database. A process you add runs inside one of the two
+roles. Run `make contract` until it passes.
 
 ## License
 
