@@ -1,4 +1,4 @@
-# BrasaCart checkout
+# EmberCart checkout
 
 Checkout takes orders, and the warehouse picks them. Every paid order has to
 turn into a row in the warehouse's picking feed, and the warehouse packs one

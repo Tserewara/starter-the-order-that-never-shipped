@@ -40,7 +40,7 @@ class Contract(unittest.TestCase):
         self.assertEqual(httpx.post(f"{SERVICE}/admin/replay/nope").status_code, 404)
 
     def test_replay_of_a_known_event(self):
-        body = httpx.post(f"{SERVICE}/orders", json={"customer": "rui"}).json()
+        body = httpx.post(f"{SERVICE}/orders", json={"customer": "sam"}).json()
         self.assertEqual(httpx.post(f"{SERVICE}/admin/replay/{body['event_id']}").status_code, 200)
 
 

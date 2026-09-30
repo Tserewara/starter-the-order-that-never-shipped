@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: BrasaCart checkout
+  title: EmberCart checkout
   version: 1.0.0
   description: >
     Checkout as the starter ships it. The image runs as `api` (port 8000) and
